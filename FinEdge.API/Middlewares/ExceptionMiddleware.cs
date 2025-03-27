@@ -44,7 +44,6 @@ public class ExceptionMiddleware
 
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        context.Response.Clear();
         context.Response.ContentType = "application/json";
 
         var (statusCode, result) = exception switch
