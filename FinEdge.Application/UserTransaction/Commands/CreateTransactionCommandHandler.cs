@@ -55,87 +55,86 @@ public class TransactionResult
 
 public class CreateTransactionCommandHandler(
     IWalletRepository walletRepository,
-    ITransactionRepository transactionRepository) : IRequestHandler<CreateTransactionCommand, Result<TransactionResult>>
+    ITransactionRepository transactionRepository)
+    : IRequestHandler<CreateTransactionCommand, Result<TransactionResult>>
 {
     public async Task<Result<TransactionResult>> Handle(
-    CreateTransactionCommand request,
-    CancellationToken cancellationToken)
+        CreateTransactionCommand request,
+        CancellationToken cancellationToken)
     {
-        await using var transaction = transactionRepository.BeginTransaction(cancellationToken);
+        var wallet = await walletRepository.GetByIdAsync(request.WalletId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Wallet), request.WalletId);
 
-        try
+        if (wallet.UserId != request.UserId)
         {
-            var wallet = await walletRepository.GetByIdAsync(request.WalletId, cancellationToken)
-                ?? throw new NotFoundException(nameof(Wallet), request.WalletId);
+            throw new UnauthorizedAccessException("User does not own this wallet");
+        }
 
-            if (wallet.UserId != request.UserId)
-            {
-                throw new UnauthorizedAccessException("User does not own this wallet");
-            }
+        bool isSuccessful = false;
+        string failureReason = "";
+        Transaction transactionEntity;
 
-            bool isSuccessful = false;
-            string failureReason = "";
-            Transaction? transactionEntity = null;
+        if (request.Type == TransactionType.Power.ToString())
+        {
+            failureReason = "Power transactions always fail";
+            isSuccessful = false;
+        }
+        else if (wallet.Balance >= request.Amount)
+        {
+            await using var dbTransaction = await walletRepository.BeginTransaction(cancellationToken);
 
-            if (request.Type == TransactionType.Power.ToString())
-            {
-                failureReason = "Power transaction failed";
-            }
-            else if (wallet.Balance >= request.Amount)
+            try
             {
                 wallet.Balance -= request.Amount;
-                isSuccessful = true;
-
                 var updateResult = await walletRepository.UpdateAsync(wallet, cancellationToken);
+
                 if (updateResult == 0)
                 {
-                    isSuccessful = false;
                     failureReason = "Failed to update wallet balance";
+                    isSuccessful = false;
+                }
+                else
+                {
+                    isSuccessful = true;
+                    await dbTransaction.CommitAsync(cancellationToken);
                 }
             }
-            else
+            catch
             {
-                failureReason = "Insufficient balance";
+                await dbTransaction.RollbackAsync(cancellationToken);
+                failureReason = "Error updating wallet balance";
+                isSuccessful = false;
             }
-
-            transactionEntity = new Transaction
-            {
-                WalletId = request.WalletId,
-                Type = Enum.Parse<TransactionType>(request.Type, true),
-                Amount = request.Amount,
-                Status = isSuccessful ? TransactionStatus.Success : TransactionStatus.Failed,
-                FailureReason = failureReason
-            };
-
-            await transactionRepository.AddAsync(transactionEntity, cancellationToken);
-
-            if (isSuccessful)
-            {
-                await transaction.CommitAsync(cancellationToken);
-            }
-            else
-            {
-                await transaction.RollbackAsync(cancellationToken);
-            }
-
-            var response = new TransactionResult
-            {
-                Id = transactionEntity.Id,
-                Type = transactionEntity.Type.ToString(),
-                Amount = transactionEntity.Amount,
-                Status = transactionEntity.Status.ToString(),
-                FailureReason = string.IsNullOrEmpty(transactionEntity.FailureReason)
-                    ? null
-                    : transactionEntity.FailureReason,
-                CreatedAt = transactionEntity.CreatedAt
-            };
-
-            return Result<TransactionResult>.Success(response);
         }
-        catch (Exception ex)
+        else
         {
-            await transaction.RollbackAsync(cancellationToken);
-            return Result<TransactionResult>.Failure(ex.Message);
+            failureReason = "Insufficient balance";
+            isSuccessful = false;
         }
+
+        transactionEntity = new Transaction
+        {
+            WalletId = request.WalletId,
+            Type = Enum.Parse<TransactionType>(request.Type, true),
+            Amount = request.Amount,
+            Status = isSuccessful ? TransactionStatus.Success : TransactionStatus.Failed,
+            FailureReason = failureReason
+        };
+
+        await transactionRepository.AddAsync(transactionEntity, cancellationToken);
+
+        var response = new TransactionResult
+        {
+            Id = transactionEntity.Id,
+            Type = transactionEntity.Type.ToString(),
+            Amount = transactionEntity.Amount,
+            Status = transactionEntity.Status.ToString(),
+            FailureReason = string.IsNullOrEmpty(transactionEntity.FailureReason)
+                ? null
+                : transactionEntity.FailureReason,
+            CreatedAt = transactionEntity.CreatedAt
+        };
+
+        return Result<TransactionResult>.Success(response);
     }
 }

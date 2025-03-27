@@ -2,6 +2,7 @@
 using FinEdge.Domain.Entities;
 using FinEdge.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace FinEdge.Infrastructure.Repositories;
 
@@ -38,5 +39,12 @@ public class WalletRepository(FinEdgeDbContext context) : IWalletRepository
         var result = await context.SaveChangesAsync(cancellationToken);
 
         return result;
+    }
+
+    public async Task<IDbContextTransaction> BeginTransaction(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return await context.Database.BeginTransactionAsync(cancellationToken);
     }
 }

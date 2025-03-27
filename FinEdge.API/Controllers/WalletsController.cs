@@ -1,4 +1,6 @@
-﻿using FinEdge.Application.UserTransaction.Commands;
+﻿using FinEdge.Application.Common.Models;
+using FinEdge.Application.UserTransaction.Commands;
+using FinEdge.Application.UserTransaction.Queries;
 using FinEdge.Application.UserWallet.Commands;
 using FinEdge.Application.UserWallet.Queries;
 using Microsoft.AspNetCore.Mvc;
@@ -63,6 +65,19 @@ public class WalletsController : ApiControllerBase
         command.WalletId = walletId;
         command.UserId = userId;
         var result = await Mediator.Send(command, cancellationToken);
+
+        return result.Succeeded
+            ? Ok(result)
+            : BadRequest(result);
+    }
+
+    [HttpGet("{walletId}/transactions")]
+    public async Task<IActionResult> GetTransactions(int walletId)
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var query = new GetWalletTransactionsQuery(walletId, userId);
+
+        var result = await Mediator.Send(query);
 
         return result.Succeeded
             ? Ok(result)
