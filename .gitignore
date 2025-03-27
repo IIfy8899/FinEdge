@@ -270,3 +270,8 @@ Packages.props
 
 #Local Log Files
 log*.txt
+/FinEdge.Infrastructure/Migrations
+/FinEdge.Infrastructure/FinEdge.Infrastructure.csproj
+/FinEdge.Application/FinEdge.Application.csproj
+/FinEdge.API/FinEdge.API.csproj
+/FinEdge.API/Properties/launchSettings.json
