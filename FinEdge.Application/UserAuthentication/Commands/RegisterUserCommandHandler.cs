@@ -1,11 +1,8 @@
 ﻿using FinEdge.Application.Common.Interfaces;
 using FinEdge.Application.Common.Models;
-using FinEdge.Application.UserWallet.Commands;
 using FinEdge.Domain.Entities;
 using FluentValidation;
 using MediatR;
-using Microsoft.Extensions.Logging;
-using ValidationException = FinEdge.Application.Exceptions.ValidationException;
 
 namespace FinEdge.Application.UserAuthentication.Commands;
 
@@ -58,13 +55,10 @@ public class RegisterUserCommandValidator : AbstractValidator<RegisterUserComman
 public class RegisterUserCommandResult
 {
     public int UserId { get; set; }
-    public int WalletId { get; set; }
 }
 
 public class RegisterUserCommandHandler(
-    ILogger<RegisterUserCommandHandler> logger,
-    IUserRepository userRepository,
-    ISender mediator) : IRequestHandler<RegisterUserCommand, Result<RegisterUserCommandResult>>
+    IUserRepository userRepository) : IRequestHandler<RegisterUserCommand, Result<RegisterUserCommandResult>>
 {
     public async Task<Result<RegisterUserCommandResult>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
@@ -81,17 +75,9 @@ public class RegisterUserCommandHandler(
             return Result<RegisterUserCommandResult>.Failure(["failed_to_register_user"]);
         }
 
-        var response = await mediator.Send(new CreateWalletCommand(user.Id), cancellationToken);
-        if (!response.Succeeded)
-        {
-            logger.LogError("Failed to create wallet for user {UserId}", user.Id);
-            return Result<RegisterUserCommandResult>.Failure(response.Errors);
-        }
-
         var userInfo = new RegisterUserCommandResult
         {
-            UserId = user.Id,
-            WalletId = response.Data!.WalletId
+            UserId = user.Id
         };
 
         return Result<RegisterUserCommandResult>.Success(userInfo);
