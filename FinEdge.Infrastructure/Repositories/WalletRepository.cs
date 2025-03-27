@@ -5,37 +5,37 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinEdge.Infrastructure.Repositories;
 
-public class WalletRepository : IWalletRepository
+public class WalletRepository(FinEdgeDbContext context) : IWalletRepository
 {
-    private readonly FinEdgeDbContext _context;
-
-    public WalletRepository(FinEdgeDbContext context)
+    public async Task<Wallet?> GetByIdAsync(int id, CancellationToken cancellationToken)
     {
-        _context = context;
+        cancellationToken.ThrowIfCancellationRequested();
+        return await context.Wallets.FindAsync(id, cancellationToken);
     }
 
-    public async Task<Wallet?> GetByIdAsync(int id)
+    public async Task<Wallet?> GetByUserIdAsync(int userId, CancellationToken cancellationToken)
     {
-        return await _context.Wallets.FindAsync(id);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return await context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId, cancellationToken);
     }
 
-    public async Task<Wallet?> GetByUserIdAsync(int userId)
+    public async Task<int> AddAsync(Wallet wallet, CancellationToken cancellationToken)
     {
-        return await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
-    }
+        cancellationToken.ThrowIfCancellationRequested();
 
-    public async Task<int> AddAsync(Wallet wallet)
-    {
-        await _context.Wallets.AddAsync(wallet);
-        var result = await _context.SaveChangesAsync();
+        await context.Wallets.AddAsync(wallet, cancellationToken);
+        var result = await context.SaveChangesAsync(cancellationToken);
 
         return result;
     }
 
-    public async Task<int> UpdateAsync(Wallet wallet)
+    public async Task<int> UpdateAsync(Wallet wallet, CancellationToken cancellationToken)
     {
-        _context.Wallets.Update(wallet);
-        var result = await _context.SaveChangesAsync();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        context.Wallets.Update(wallet);
+        var result = await context.SaveChangesAsync(cancellationToken);
 
         return result;
     }

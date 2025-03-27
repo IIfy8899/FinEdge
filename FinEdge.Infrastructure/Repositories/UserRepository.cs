@@ -6,35 +6,36 @@ using System.Linq.Expressions;
 
 namespace FinEdge.Infrastructure.Repositories;
 
-public class UserRepository : IUserRepository
+public class UserRepository(FinEdgeDbContext context) : IUserRepository
 {
-    private readonly FinEdgeDbContext _context;
-
-    public UserRepository(FinEdgeDbContext context)
+    public async Task<User?> GetByIdAsync(int id, CancellationToken cancellationToken)
     {
-        _context = context;
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return await context.Users.FindAsync(id, cancellationToken);
     }
 
-    public async Task<User?> GetByIdAsync(int id)
+    public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken)
     {
-        return await _context.Users.FindAsync(id);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return await context.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
     }
 
-    public async Task<User?> GetByEmailAsync(string email)
+    public async Task<int> AddAsync(User user, CancellationToken cancellationToken)
     {
-        return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-    }
+        cancellationToken.ThrowIfCancellationRequested();
 
-    public async Task<int> AddAsync(User user)
-    {
-        await _context.Users.AddAsync(user);
-        var result = await _context.SaveChangesAsync();
+        await context.Users.AddAsync(user, cancellationToken);
+        var result = await context.SaveChangesAsync(cancellationToken);
         
         return result;
     }
 
-    public async Task<bool> AnyAsync(Expression<Func<User, bool>> predicate)
+    public async Task<bool> AnyAsync(Expression<Func<User, bool>> predicate, CancellationToken cancellationToken)
     {
-        return await _context.Users.AnyAsync(predicate);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return await context.Users.AnyAsync(predicate, cancellationToken);
     }
 }

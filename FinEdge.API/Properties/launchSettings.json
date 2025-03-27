@@ -1,22 +1,18 @@
-﻿{
+{
   "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
-    "http": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": false,
-      "applicationUrl": "http://localhost:5284",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
     "https": {
       "commandName": "Project",
       "dotnetRunMessages": true,
-      "launchBrowser": false,
+      "launchBrowser": true,
+      "launchUrl": "swagger",
       "applicationUrl": "https://localhost:7053;http://localhost:5284",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "JWT__KEY": "bxhgwy37863 x46783xb7 38x4x3v4g7 fx38743473874",
+        "JWT__ISSUER": "FinEdge",
+        "JWT__AUDIENCE": "FinEdge-Users",
+        "FINEDGE__DB": "Server=(localdb)\\mssqllocaldb;Database=FinEdge;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=true"
       }
     }
   }

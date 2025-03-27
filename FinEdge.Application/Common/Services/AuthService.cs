@@ -15,7 +15,7 @@ public class AuthService(
 {
     public async Task<string?> Authenticate(string email, string password)
     {
-        var user = await userRepository.GetByEmailAsync(email)
+        var user = await userRepository.GetByEmailAsync(email, CancellationToken.None)
             ?? throw new NotFoundException(nameof(User), email);
 
         if (!VerifyPassword(password, user.PasswordHash))
@@ -34,8 +34,7 @@ public class AuthService(
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim(JwtRegisteredClaimNames.Email, user.Email)
         };
 
         var token = new JwtSecurityToken(

@@ -18,9 +18,13 @@ public class CreateWalletCommandHandler(
 {
     public async Task<Result<CreateWalletCommandResult>> Handle(CreateWalletCommand request, CancellationToken cancellationToken)
     {
-        var user = await userRepository.GetByIdAsync(request.UserId);
+        var user = await userRepository.GetByIdAsync(request.UserId, cancellationToken);
         if (user == null)
             return Result<CreateWalletCommandResult>.Failure(["user_not_found"]);
+
+        var walletExist = await walletRepository.GetByUserIdAsync(user.Id, cancellationToken);
+        if (walletExist != null)
+            return Result<CreateWalletCommandResult>.Failure(["user_wallet_already_exist"]);
 
         var wallet = new Wallet
         {
@@ -28,7 +32,7 @@ public class CreateWalletCommandHandler(
             Balance = 0
         };
 
-        var response = await walletRepository.AddAsync(wallet);
+        var response = await walletRepository.AddAsync(wallet, cancellationToken);
         if (response == 0)
             return Result<CreateWalletCommandResult>.Failure(["failed_to_create_wallet"]);
 

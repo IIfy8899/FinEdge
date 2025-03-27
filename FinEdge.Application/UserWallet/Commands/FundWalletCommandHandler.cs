@@ -23,7 +23,7 @@ public class FundWalletCommandHandler(
 {
     public async Task<Result<GetWalletQueryResult>> Handle(FundWalletCommand request, CancellationToken cancellationToken)
     {
-        var wallet = await walletRepository.GetByIdAsync(request.WalletId)
+        var wallet = await walletRepository.GetByIdAsync(request.WalletId, cancellationToken)
             ?? throw new NotFoundException(nameof(Wallet), request.WalletId);
 
         if (wallet.UserId != request.UserId)
@@ -32,7 +32,7 @@ public class FundWalletCommandHandler(
         }
 
         wallet.Balance += request.Amount;
-        var response = await walletRepository.UpdateAsync(wallet);
+        var response = await walletRepository.UpdateAsync(wallet, cancellationToken);
         if (response == 0)
         {
             return Result<GetWalletQueryResult>.Failure(["failed_to_fund_wallet"]);

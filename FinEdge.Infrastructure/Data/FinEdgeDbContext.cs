@@ -23,5 +23,6 @@ public class FinEdgeDbContext(DbContextOptions<FinEdgeDbContext> options) : DbCo
         var transactionBuilder = modelBuilder.Entity<Transaction>();
         transactionBuilder.Property(t => t.Amount).HasColumnType("decimal(18,2)");
         transactionBuilder.Property(t => t.Type).HasConversion<string>();
+        transactionBuilder.Property(t => t.Status).HasConversion<string>();
     }
 }

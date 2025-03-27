@@ -43,12 +43,12 @@ public class RegisterUserCommandValidator : AbstractValidator<RegisterUserComman
 
     private async Task<bool> BeUniqueName(string name, CancellationToken cancellationToken)
     {
-        return !await _userRepository.AnyAsync(u => u.Name == name);
+        return !await _userRepository.AnyAsync(u => u.Name == name, cancellationToken);
     }
 
     private async Task<bool> BeUniqueEmail(string email, CancellationToken cancellationToken)
     {
-        return !await _userRepository.AnyAsync(u => u.Email == email);
+        return !await _userRepository.AnyAsync(u => u.Email == email, cancellationToken);
     }
 }
 
@@ -69,7 +69,7 @@ public class RegisterUserCommandHandler(
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
         };
 
-        var result = await userRepository.AddAsync(user);
+        var result = await userRepository.AddAsync(user, cancellationToken);
         if (result == 0)
         {
             return Result<RegisterUserCommandResult>.Failure(["failed_to_register_user"]);

@@ -20,7 +20,7 @@ public class GetWalletQueryHandler(
 {
     public async Task<Result<GetWalletQueryResult>> Handle(GetWalletQuery request, CancellationToken cancellationToken)
     {
-        var wallet = await walletRepository.GetByIdAsync(request.WalletId)
+        var wallet = await walletRepository.GetByIdAsync(request.WalletId, cancellationToken)
             ?? throw new NotFoundException(nameof(Wallet), request.WalletId);
 
         if (wallet.UserId != request.UserId)
