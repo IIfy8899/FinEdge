@@ -4,6 +4,7 @@ using FinEdge.Domain.Entities;
 using FinEdge.Domain.Enums;
 using FluentValidation;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 using NotFoundException = FinEdge.Application.Exceptions.NotFoundException;
 using UnauthorizedAccessException = FinEdge.Application.Exceptions.UnauthorizedAccessException;
@@ -62,79 +63,116 @@ public class CreateTransactionCommandHandler(
         CreateTransactionCommand request,
         CancellationToken cancellationToken)
     {
-        var wallet = await walletRepository.GetByIdAsync(request.WalletId, cancellationToken)
-            ?? throw new NotFoundException(nameof(Wallet), request.WalletId);
+        const int maxRetries = 3;
+        int attempt = 0;
 
-        if (wallet.UserId != request.UserId)
+        while (attempt < maxRetries)
         {
-            throw new UnauthorizedAccessException("User does not own this wallet");
-        }
-
-        bool isSuccessful = false;
-        string failureReason = "";
-        Transaction transactionEntity;
-
-        if (request.Type == TransactionType.Power.ToString())
-        {
-            failureReason = "Power transactions always fail";
-            isSuccessful = false;
-        }
-        else if (wallet.Balance >= request.Amount)
-        {
-            await using var dbTransaction = await walletRepository.BeginTransaction(cancellationToken);
+            attempt++;
 
             try
             {
-                wallet.Balance -= request.Amount;
-                var updateResult = await walletRepository.UpdateAsync(wallet, cancellationToken);
+                var wallet = await walletRepository.GetByIdAsync(request.WalletId, cancellationToken)
+                    ?? throw new NotFoundException(nameof(Wallet), request.WalletId);
 
-                if (updateResult == 0)
+                if (wallet.UserId != request.UserId)
                 {
-                    failureReason = "Failed to update wallet balance";
+                    throw new UnauthorizedAccessException("User does not own this wallet");
+                }
+
+                bool isSuccessful = false;
+                string failureReason = "";
+                Transaction transactionEntity;
+
+                if (request.Type == TransactionType.Power.ToString())
+                {
+                    failureReason = "Power transactions always fail";
                     isSuccessful = false;
+                }
+                else if (wallet.Balance >= request.Amount)
+                {
+                    await using var dbTransaction = await walletRepository.BeginTransaction(cancellationToken);
+
+                    try
+                    {
+                        var currentWallet = await walletRepository.GetByIdAsync(
+                            request.WalletId,
+                            cancellationToken);
+
+                        if (currentWallet == null)
+                            return Result<TransactionResult>.Failure("Wallet not found");
+
+                        if (currentWallet.Balance < request.Amount)
+                        {
+                            failureReason = "Insufficient balance";
+                            isSuccessful = false;
+                        }
+                        else
+                        {
+                            currentWallet.Balance -= request.Amount;
+                            var updateResult = await walletRepository.UpdateAsync(
+                                currentWallet,
+                                cancellationToken);
+
+                            if (updateResult == 0)
+                            {
+                                failureReason = "Failed to update wallet balance";
+                                isSuccessful = false;
+                            }
+                            else
+                            {
+                                isSuccessful = true;
+                                await dbTransaction.CommitAsync(cancellationToken);
+                            }
+                        }
+                    }
+                    catch (DbUpdateConcurrencyException)
+                    {
+                        await dbTransaction.RollbackAsync(cancellationToken);
+                        continue;
+                    }
+                    catch
+                    {
+                        await dbTransaction.RollbackAsync(cancellationToken);
+                        failureReason = "Error updating wallet balance";
+                        isSuccessful = false;
+                    }
                 }
                 else
                 {
-                    isSuccessful = true;
-                    await dbTransaction.CommitAsync(cancellationToken);
+                    failureReason = "Insufficient balance";
+                    isSuccessful = false;
                 }
+
+                transactionEntity = new Transaction
+                {
+                    WalletId = request.WalletId,
+                    Type = Enum.Parse<TransactionType>(request.Type, true),
+                    Amount = request.Amount,
+                    Status = isSuccessful ? TransactionStatus.Success : TransactionStatus.Failed,
+                    FailureReason = failureReason
+                };
+
+                await transactionRepository.AddAsync(transactionEntity, cancellationToken);
+
+                return Result<TransactionResult>.Success(new TransactionResult
+                {
+                    Id = transactionEntity.Id,
+                    Type = transactionEntity.Type.ToString(),
+                    Amount = transactionEntity.Amount,
+                    Status = transactionEntity.Status.ToString(),
+                    FailureReason = string.IsNullOrEmpty(transactionEntity.FailureReason)
+                        ? null
+                        : transactionEntity.FailureReason,
+                    CreatedAt = transactionEntity.CreatedAt
+                });
             }
-            catch
+            catch (DbUpdateConcurrencyException) when (attempt < maxRetries)
             {
-                await dbTransaction.RollbackAsync(cancellationToken);
-                failureReason = "Error updating wallet balance";
-                isSuccessful = false;
+                continue;
             }
         }
-        else
-        {
-            failureReason = "Insufficient balance";
-            isSuccessful = false;
-        }
 
-        transactionEntity = new Transaction
-        {
-            WalletId = request.WalletId,
-            Type = Enum.Parse<TransactionType>(request.Type, true),
-            Amount = request.Amount,
-            Status = isSuccessful ? TransactionStatus.Success : TransactionStatus.Failed,
-            FailureReason = failureReason
-        };
-
-        await transactionRepository.AddAsync(transactionEntity, cancellationToken);
-
-        var response = new TransactionResult
-        {
-            Id = transactionEntity.Id,
-            Type = transactionEntity.Type.ToString(),
-            Amount = transactionEntity.Amount,
-            Status = transactionEntity.Status.ToString(),
-            FailureReason = string.IsNullOrEmpty(transactionEntity.FailureReason)
-                ? null
-                : transactionEntity.FailureReason,
-            CreatedAt = transactionEntity.CreatedAt
-        };
-
-        return Result<TransactionResult>.Success(response);
+        return Result<TransactionResult>.Failure(["Unable to complete transaction due to concurrent modifications"]);
     }
 }

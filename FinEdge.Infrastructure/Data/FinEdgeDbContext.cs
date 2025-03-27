@@ -11,14 +11,15 @@ public class FinEdgeDbContext(DbContextOptions<FinEdgeDbContext> options) : DbCo
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // modelBuilder.ApplyConfigurationsFromAssembly(typeof(FinEdgeDbContext).Assembly);
-
         var userBuilder = modelBuilder.Entity<User>();
         userBuilder.HasIndex(u => u.Name).IsUnique();
         userBuilder.HasIndex(u => u.Email).IsUnique();
 
         var walletBuilder = modelBuilder.Entity<Wallet>();
         walletBuilder.Property(w => w.Balance).HasColumnType("decimal(18,2)");
+        walletBuilder.ToTable(t => t.HasCheckConstraint(
+            "CK_Wallets_BalanceNotNegative",
+            "[Balance] >= 0"));
 
         var transactionBuilder = modelBuilder.Entity<Transaction>();
         transactionBuilder.Property(t => t.Amount).HasColumnType("decimal(18,2)");
