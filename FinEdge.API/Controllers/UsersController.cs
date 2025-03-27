@@ -4,10 +4,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FinEdge.API.Controllers;
 
+[AllowAnonymous]
+[Route("api/users/")]
 public class UserController : ApiControllerBase
 {
-    [AllowAnonymous]
-    [HttpPost("user.register", Name = nameof(Register))]
+    [HttpPost("register", Name = nameof(Register))]
     public async Task<IActionResult> Register(
         [FromBody] RegisterUserCommand command,
         CancellationToken cancellationToken)
@@ -17,5 +18,17 @@ public class UserController : ApiControllerBase
         return result.Succeeded
             ? Ok(result)
             : BadRequest(result);
+    }
+
+    [HttpPost("login", Name = nameof(Login))]
+    public async Task<IActionResult> Login(
+        [FromBody] LoginCommand command,
+        CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(command, cancellationToken);
+
+        return result.Succeeded
+            ? Ok(result)
+            : Unauthorized(result);
     }
 }

@@ -78,7 +78,7 @@ public class RegisterUserCommandHandler(
         var result = await userRepository.AddAsync(user);
         if (result == 0)
         {
-            return Result<RegisterUserCommandResult>.Failure("failed_to_register_user");
+            return Result<RegisterUserCommandResult>.Failure(["failed_to_register_user"]);
         }
 
         var response = await mediator.Send(new CreateWalletCommand(user.Id), cancellationToken);
